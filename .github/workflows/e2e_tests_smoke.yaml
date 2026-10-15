@@ -8,6 +8,9 @@ name: e2e-smoke
 # It is still scoped by *platform*, via reusable_repo_changes.yaml: an
 # Android-only change anywhere in the repo runs the android jobs and skips the
 # four platforms it cannot affect.
+#
+# dev-loop Phase 0 smoke: this comment-only change exists to prove that the
+# smoke workflow runs unmodified on the dev-loop fork via an intra-fork PR.
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-smoke
