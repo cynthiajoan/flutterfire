@@ -1,5 +1,8 @@
 name: e2e-app-installations
 
+# dev-loop Phase 0 live-tier smoke: comment-only change so this live-tier
+# workflow runs on the dev-loop fork with the fork's TESTS_E2E_* secrets.
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-app_installations
   cancel-in-progress: true
