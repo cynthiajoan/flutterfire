@@ -386,5 +386,177 @@ void main() {
         ),
       ).called(1);
     });
+
+    test(
+        'invokeOperation wraps HTML, JSON-array, and non-string-message non-200 responses in DataConnectError with status code (DC-9)',
+        () async {
+      String deserializer(String data) => 'Deserialized Data';
+
+      // 1. HTML 502 error body preserves status code 502 in DataConnectError.
+      when(
+        mockHttpClient.post(
+          any,
+          headers: anyNamed('headers'),
+          body: anyNamed('body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response('<html>502 Bad Gateway</html>', 502),
+      );
+
+      await expectLater(
+        () => transport.invokeOperation(
+          'testQuery',
+          'executeQuery',
+          deserializer,
+          null,
+          null,
+          null,
+        ),
+        throwsA(
+          isA<DataConnectError>().having(
+            (e) => e.message,
+            'message',
+            contains('502'),
+          ),
+        ),
+      );
+
+      // 2. JSON array error body does not leak TypeError.
+      when(
+        mockHttpClient.post(
+          any,
+          headers: anyNamed('headers'),
+          body: anyNamed('body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response('[{"error": "bad"}]', 503),
+      );
+
+      await expectLater(
+        () => transport.invokeOperation(
+          'testQuery',
+          'executeQuery',
+          deserializer,
+          null,
+          null,
+          null,
+        ),
+        throwsA(
+          isA<DataConnectError>().having(
+            (e) => e.message,
+            'message',
+            contains('503'),
+          ),
+        ),
+      );
+
+      // 3. Non-string message field in error body does not leak TypeError.
+      when(
+        mockHttpClient.post(
+          any,
+          headers: anyNamed('headers'),
+          body: anyNamed('body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response('{"message": 12345}', 500),
+      );
+
+      await expectLater(
+        () => transport.invokeOperation(
+          'testQuery',
+          'executeQuery',
+          deserializer,
+          null,
+          null,
+          null,
+        ),
+        throwsA(
+          isA<DataConnectError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('500'), contains('12345')),
+          ),
+        ),
+      );
+    });
+
+    test(
+        'invokeOperation parses string/float extensions.ttl and clamps negative or overflowing ttl values (DC-1, DC-6)',
+        () async {
+      String deserializer(String data) => 'Deserialized Data';
+
+      // 1. Proto-JSON string ttl ("30s").
+      when(
+        mockHttpClient.post(
+          any,
+          headers: anyNamed('headers'),
+          body: anyNamed('body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response(
+          '{"data": {"key": "value"}, "extensions": {"ttl": "30s"}}',
+          200,
+        ),
+      );
+
+      final resStringTtl = await transport.invokeOperation(
+        'testQuery',
+        'executeQuery',
+        deserializer,
+        null,
+        null,
+        null,
+      );
+      expect(resStringTtl.ttl, const Duration(seconds: 30));
+
+      // 2. Huge ttl does not overflow Duration into negative microseconds.
+      when(
+        mockHttpClient.post(
+          any,
+          headers: anyNamed('headers'),
+          body: anyNamed('body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response(
+          '{"data": {"key": "value"}, "extensions": {"ttl": 10000000000000}}',
+          200,
+        ),
+      );
+
+      final resHugeTtl = await transport.invokeOperation(
+        'testQuery',
+        'executeQuery',
+        deserializer,
+        null,
+        null,
+        null,
+      );
+      expect(resHugeTtl.ttl, isNotNull);
+      expect(resHugeTtl.ttl!.isNegative, isFalse);
+
+      // 3. Negative ttl clamps to Duration.zero.
+      when(
+        mockHttpClient.post(
+          any,
+          headers: anyNamed('headers'),
+          body: anyNamed('body'),
+        ),
+      ).thenAnswer(
+        (_) async => http.Response(
+          '{"data": {"key": "value"}, "extensions": {"ttl": -10}}',
+          200,
+        ),
+      );
+
+      final resNegativeTtl = await transport.invokeOperation(
+        'testQuery',
+        'executeQuery',
+        deserializer,
+        null,
+        null,
+        null,
+      );
+      expect(resNegativeTtl.ttl, Duration.zero);
+    });
   });
 }

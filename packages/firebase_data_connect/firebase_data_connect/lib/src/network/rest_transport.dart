@@ -116,13 +116,20 @@ class RestTransport implements DataConnectTransport {
         body: json.encode(body),
         headers: headers,
       );
-      Map<String, dynamic> bodyJson =
-          jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
+      final String rawBody = utf8.decode(r.bodyBytes, allowMalformed: true);
+      Object? decodedBody;
+      try {
+        decodedBody = jsonDecode(rawBody);
+      } on FormatException {
+        decodedBody = null;
+      }
 
       if (r.statusCode != 200) {
-        String message = bodyJson.containsKey('message')
-            ? bodyJson['message']!
-            : utf8.decode(r.bodyBytes);
+        String message = rawBody;
+        if (decodedBody is Map && decodedBody['message'] != null) {
+          final Object? rawMessage = decodedBody['message'];
+          message = rawMessage is String ? rawMessage : rawMessage.toString();
+        }
         throw DataConnectError(
           r.statusCode == 401
               ? DataConnectErrorCode.unauthorized
@@ -130,14 +137,27 @@ class RestTransport implements DataConnectTransport {
           "Received a status code of ${r.statusCode} with a message '$message'",
         );
       }
-      final Map<String, dynamic>? extensions =
-          bodyJson['extensions'] as Map<String, dynamic>?;
+
+      if (decodedBody is! Map<String, dynamic>) {
+        throw DataConnectError(
+          DataConnectErrorCode.other,
+          'Invalid JSON object in response body',
+        );
+      }
+      final Map<String, dynamic> bodyJson = decodedBody;
+      final Object? rawExtensions = bodyJson['extensions'];
+      final Map<String, dynamic>? extensions = rawExtensions is Map
+          ? Map<String, dynamic>.from(rawExtensions)
+          : null;
       final serverResponse = ServerResponse(bodyJson, extensions: extensions);
       if (extensions != null && extensions.containsKey('ttl')) {
-        serverResponse.ttl = Duration(seconds: extensions['ttl'] as int);
+        final Duration? parsedTtl = _parseTtl(extensions['ttl']);
+        if (parsedTtl != null) {
+          serverResponse.ttl = parsedTtl;
+        }
       }
       return serverResponse;
-    } on Exception catch (e) {
+    } catch (e) {
       if (e is DataConnectError) {
         rethrow;
       }
@@ -146,6 +166,31 @@ class RestTransport implements DataConnectTransport {
         'Failed to invoke operation: $e',
       );
     }
+  }
+
+  static const int _kMaxTtlSeconds = 315360000;
+
+  static Duration? _parseTtl(Object? rawTtl) {
+    num? seconds;
+    if (rawTtl is num) {
+      seconds = rawTtl;
+    } else if (rawTtl is String) {
+      final String trimmed = rawTtl.trim();
+      final String numericPart = trimmed.endsWith('s')
+          ? trimmed.substring(0, trimmed.length - 1)
+          : trimmed;
+      seconds = num.tryParse(numericPart);
+    }
+    if (seconds == null || seconds.isNaN) {
+      return null;
+    }
+    if (seconds.isNegative) {
+      return Duration.zero;
+    }
+    if (seconds > _kMaxTtlSeconds) {
+      return const Duration(seconds: _kMaxTtlSeconds);
+    }
+    return Duration(seconds: seconds.floor());
   }
 
   /// Invokes query REST endpoint.
