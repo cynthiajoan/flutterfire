@@ -61,7 +61,7 @@ abstract class MethodChannelTask extends TaskPlatform {
                   'path': path,
                   'bytesTransferred': _snapshot.bytesTransferred,
                   'totalBytes': _snapshot.totalBytes,
-                  'metadata': _snapshot.metadata
+                  if (_lastMetadata != null) 'metadata': _lastMetadata
                 },
               );
             }
@@ -76,10 +76,13 @@ abstract class MethodChannelTask extends TaskPlatform {
           }
           if (taskState == TaskState.canceled) {
             _didComplete = true;
-            MethodChannelTaskSnapshot snapshot = MethodChannelTaskSnapshot(
-                storage,
-                taskState,
-                Map<String, dynamic>.from(events['snapshot']));
+            final snapshotData = Map<String, dynamic>.from(events['snapshot']);
+            if (snapshotData['metadata'] is Map) {
+              _lastMetadata =
+                  Map<String, dynamic>.from(snapshotData['metadata']);
+            }
+            MethodChannelTaskSnapshot snapshot =
+                MethodChannelTaskSnapshot(storage, taskState, snapshotData);
             _snapshot = snapshot;
             break;
           }
@@ -90,10 +93,13 @@ abstract class MethodChannelTask extends TaskPlatform {
               // Required for android which fires another event when already cancelled
               &&
               snapshot.state != TaskState.canceled) {
-            MethodChannelTaskSnapshot snapshot = MethodChannelTaskSnapshot(
-                storage,
-                taskState,
-                Map<String, dynamic>.from(events['snapshot']));
+            final snapshotData = Map<String, dynamic>.from(events['snapshot']);
+            if (snapshotData['metadata'] is Map) {
+              _lastMetadata =
+                  Map<String, dynamic>.from(snapshotData['metadata']);
+            }
+            MethodChannelTaskSnapshot snapshot =
+                MethodChannelTaskSnapshot(storage, taskState, snapshotData);
             _snapshot = snapshot;
 
             yield snapshot;
@@ -108,6 +114,16 @@ abstract class MethodChannelTask extends TaskPlatform {
           }
         }
       } catch (exception, stack) {
+        _didComplete = true;
+        _exception = exception;
+        if (_completer != null && !_completer!.isCompleted) {
+          _completer!.complete(
+            catchFuturePlatformException<TaskSnapshotPlatform>(
+              exception,
+              stack,
+            ),
+          );
+        }
         convertPlatformException(exception, stack);
       }
     }
@@ -153,6 +169,8 @@ abstract class MethodChannelTask extends TaskPlatform {
   Object? _exception;
 
   bool _didComplete = false;
+
+  Map<String, dynamic>? _lastMetadata;
 
   Completer<TaskSnapshotPlatform>? _completer;
 
