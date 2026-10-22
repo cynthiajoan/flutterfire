@@ -1,6 +1,9 @@
 # Uncomment this line to define a global platform for your project
 platform :ios, '15.0'
 
+# omg/105320 RC validation: force the patched Firebase Apple SDK.
+$FirebaseSDKVersion = '12.19.3'
+
 require 'yaml'
 
 pubspec = YAML.load_file(File.join('..', File.join('..', 'pubspec.yaml')))
@@ -51,7 +54,15 @@ target 'Runner' do
     end
   end
 
-  pod 'FirebaseFirestore', :git => 'https://github.com/invertase/firestore-ios-sdk-frameworks.git', :tag => "#{firebase_sdk_version}"
+  # omg/105320 RC validation: the 12.19.3 pods are not on CocoaPods trunk yet,
+  # so take the four pods that changed in the release from the git tag and let
+  # everything else (12.19.x) resolve from trunk. Firestore builds from source.
+  firebase_ios_git = 'https://github.com/firebase/firebase-ios-sdk.git'
+  firebase_ios_tag = "CocoaPods-#{firebase_sdk_version}"
+  pod 'Firebase', :git => firebase_ios_git, :tag => firebase_ios_tag
+  pod 'FirebaseCore', :git => firebase_ios_git, :tag => firebase_ios_tag
+  pod 'FirebaseFirestore', :git => firebase_ios_git, :tag => firebase_ios_tag
+  pod 'FirebaseFirestoreInternal', :git => firebase_ios_git, :tag => firebase_ios_tag
 end
 
 post_install do |installer|

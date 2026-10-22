@@ -284,6 +284,18 @@ jobs:
             done
           fi
           exit $BUILD_EXIT
+      - name: 'omg/105320: Firestore root bundle check (CocoaPods build)'
+        if: ${{ !inputs.ios-spm }}
+        working-directory: ${{ inputs.package-path }}/example
+        run: |
+          echo "::group::Podfile.lock (Firebase entries)"
+          grep -nE "^  - (Firebase|FirebaseCore|FirebaseFirestore|FirebaseFirestoreInternal|FirebaseCoreInternal|gRPC-C\+\+|gRPC-Core|BoringSSL-GRPC|abseil) \(" ios/Podfile.lock || true
+          grep -nE "CocoaPods-12|firebase-ios-sdk.git" -B2 -A3 ios/Podfile.lock || true
+          echo "::endgroup::"
+          echo "::group::Built products"
+          ls -la build/ios/iphonesimulator/Runner.app/ build/ios/iphonesimulator/Runner.app/Frameworks 2>/dev/null || true
+          echo "::endgroup::"
+          python3 "$GITHUB_WORKSPACE/.github/workflows/scripts/check_firestore_roots.py" build/ios/iphonesimulator/Runner.app
       - name: Install Cloud Functions dependencies
         if: inputs.use-firebase-emulators
         # `firebase emulators:exec` does not install these itself (the old
