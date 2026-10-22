@@ -246,7 +246,7 @@ jobs:
           restore-keys: pods-v2-${{ runner.os }}-${{ inputs.cache-key-suffix }}-ios-
       - name: 'Build Application'
         working-directory: ${{ inputs.package-path }}/example
-        timeout-minutes: 25
+        timeout-minutes: 50
         run: |
           export PATH="/usr/lib/ccache:/usr/local/opt/ccache/libexec:$PATH"
           export CCACHE_SLOPPINESS=clang_index_store,file_stat_matches,include_file_ctime,include_file_mtime,ivfsoverlay,pch_defines,modules,system_headers,time_macros
@@ -260,9 +260,8 @@ jobs:
           # resolve package dependencies"). Retry exactly once, for exactly
           # that error class - anything else fails immediately.
           set +e
-          flutter build ios --no-codesign --simulator --debug --target="./$TEST_TARGET" --dart-define=CI=true > build_output.log 2>&1
-          BUILD_EXIT=$?
-          cat build_output.log
+          flutter build ios --no-codesign --simulator --debug --target="./$TEST_TARGET" --dart-define=CI=true 2>&1 | tee build_output.log
+          BUILD_EXIT=${PIPESTATUS[0]}
           if [ $BUILD_EXIT -ne 0 ] && grep -q "Could not resolve package dependencies" build_output.log; then
             echo "SPM package resolution race detected; retrying the build once."
             flutter clean > /dev/null
