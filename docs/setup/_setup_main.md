@@ -202,7 +202,7 @@ Product                                          | Plugin name                  
 [{{auth}}][auth docs]                            | `firebase_auth`                | {{YES}} | {{YES}} | {{YES}} | beta | beta
 [{{firestore}}][firestore docs]                  | `cloud_firestore`              | {{YES}} | {{YES}} | {{YES}} | beta | beta
 [{{cloud_functions}}][functions docs]            | `cloud_functions`              | {{YES}} | {{YES}} | {{YES}} | beta |
-[{{messaging_longer}}][fcm docs]                 | `firebase_messaging`           | {{YES}} | {{YES}} | {{YES}} | beta |
+[{{messaging}}][fcm docs]                        | `firebase_messaging`           | {{YES}} | {{YES}} | {{YES}} | beta |
 [{{storage}}][storage docs]                      | `firebase_storage`             | {{YES}} | {{YES}} | {{YES}} | beta | beta
 [{{crashlytics}}][crashlytics docs]              | `firebase_crashlytics`         | {{YES}} | {{YES}} |         | beta |
 [{{data_connect_short}}][dataconnect docs]       | `firebase_data_connect`        | {{YES}} | {{YES}} | {{YES}} | |
